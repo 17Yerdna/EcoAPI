@@ -14,6 +14,14 @@ import tools.jackson.databind.ObjectMapper
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = ["jwt.secret=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"])
 class ApiIntegrationTest {
+    @Test fun `SCC humedad viaja por contrato y persiste`() {
+        val token=login("operario1")
+        val r=request("POST","/pesajes","""{"puntoId":1,"material":"PAPEL","pesoBruto":10,"tara":2,"humedadEstimada":23.5}""",token)
+        assertEquals(201,r.statusCode(),r.body())
+        val j=json.readTree(r.body()); assertEquals(23.5,j.get("humedadEstimada").asDouble())
+        assertEquals(23.5,db.queryForObject("select humedad_estimada from pesaje where id=?",Double::class.java,j.get("id").asLong()))
+        assertEquals(400,request("POST","/pesajes","""{"puntoId":1,"material":"PAPEL","pesoBruto":10,"tara":2,"humedadEstimada":101}""",token).statusCode())
+    }
     @Test fun `SCB auditor solo posee lectura`() {
         val token=login("auditor1")
         assertEquals(200,request("GET","/puntos",token=token).statusCode())
