@@ -23,6 +23,7 @@ El contenedor API corre como usuario sin privilegios. PostgreSQL usa volumen per
 | operario1 | Eco2026* | OPERARIO |
 | supervisor1 | Eco2026* | SUPERVISOR |
 | admin | Eco2026* | ADMINISTRADOR |
+| auditor1 | Eco2026* | AUDITOR (SC-B, solo lectura) |
 
 Son credenciales públicas del examen, no de producción. Las contraseñas se guardan como BCrypt. Semilla: 12 puntos/3 zonas, 2 rutas, 15 pesajes; la ruta de hoy tiene 6 puntos y está abierta. Las fechas de semilla se fijan al primer arranque de la base, zona America/Lima.
 
@@ -67,4 +68,4 @@ Importar `docs/api/EcoAPI.postman_collection.json` en Postman y ejecutar en orde
 
 `web` delega en `servicio`; JPA persiste en PostgreSQL y Flyway controla esquema/semillas. La autorización reside en el servicio y JWT valida firma/expiración. Bloqueo de ruta serializa alta/cierre. Los planes están en `docs/superpowers`. En la carpeta compartida del proyecto: `CONTEXTO_PARA_IA.md` y `tasks/handoff.md` registran cómo retomar.
 
-No se retrofechan commits. El cambio SC se implementará al ser asignado y el tag final se creará tras verificación de entrega.
+No se retrofechan commits. SC-B agrega AUDITOR; SC-C agrega humedadEstimada (0..100) al contrato y PostgreSQL. Los cambios y sus pruebas están en docs/cambios. La entrega se identifica mediante v1.0-unidad2.
