@@ -42,5 +42,6 @@ open class Pesaje(
     open var motivoAnulacion: String? = null,
     open var anuladoPor: Long? = null,
     open var anuladoEn: Instant? = null,
-    @Column(unique=true) open var claveCliente: String? = null
+    @Column(unique=true) open var claveCliente: String? = null,
+    open var humedadEstimada: Double = 0.0
 )

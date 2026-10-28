@@ -10,7 +10,8 @@ data class PesajeRequest(
     @field:NotBlank @field:Size(max=80) val material: String,
     val pesoBruto: Double, val tara: Double,
     @field:Size(max=500) val observacion: String = "",
-    @field:Size(max=100) val claveCliente: String? = null
+    @field:Size(max=100) val claveCliente: String? = null,
+    @field:DecimalMin("0.0") @field:DecimalMax("100.0") val humedadEstimada: Double = 0.0
 )
 data class CrearPuntoRequest(
     @field:NotBlank @field:Size(max=180) val razonSocial: String,
