@@ -68,7 +68,7 @@ class EcoService(private val usuarios: UsuarioRepository,private val puntos: Pun
         asignaciones.saveAndFlush(RutaPunto(rutaId=rutaId,puntoId=puntoId,secuencia=(existentes.maxOfOrNull { it.secuencia } ?: 0)+1))
         return rutaDto(r)
     }
-    private fun pesajeDto(v: Pesaje): Map<String,Any> = mapOf("id" to v.id,"puntoId" to v.puntoId,"fechaHora" to v.fechaHora.atZone(zona).toOffsetDateTime().toString(),"material" to v.material,"pesoBruto" to v.pesoBruto,"tara" to v.tara,"pesoNeto" to v.pesoNeto,"operario" to usuarios.findById(v.operarioId).orElseThrow().usuario,"estado" to if(v.anulado) mapOf("tipo" to "ANULADO","motivo" to (v.motivoAnulacion ?: "")) else mapOf("tipo" to "REGISTRADO"),"observacion" to v.observacion,"pendiente" to false)
+    private fun pesajeDto(v: Pesaje): Map<String,Any> = mapOf("id" to v.id,"puntoId" to v.puntoId,"fechaHora" to v.fechaHora.atZone(zona).toOffsetDateTime().toString(),"material" to v.material,"pesoBruto" to v.pesoBruto,"tara" to v.tara,"pesoNeto" to v.pesoNeto,"operario" to usuarios.findById(v.operarioId).orElseThrow().usuario,"estado" to if(v.anulado) mapOf("tipo" to "ANULADO","motivo" to (v.motivoAnulacion ?: "")) else mapOf("tipo" to "REGISTRADO"),"observacion" to v.observacion,"pendiente" to false,"humedadEstimada" to v.humedadEstimada)
     fun historial(puntoId: Long,p: Int,t: Int): PaginaResponse<Map<String,Any>> {
         exigir("PESAJE_LEER")
         if(!puntos.existsById(puntoId)) throw ErrorNegocio(404,"Punto no encontrado")
@@ -82,7 +82,7 @@ class EcoService(private val usuarios: UsuarioRepository,private val puntos: Pun
         val r=rutas.delDia(u.id,hoy()) ?: throw ErrorNegocio(404,"No hay ruta asignada")
         val locked=bloquearRuta(r.id); ReglasPesaje.rutaAbierta(locked.cerrada)
         if(asignaciones.findByRutaIdAndPuntoId(r.id,puntoId)==null) throw ErrorNegocio(404,"Punto fuera de la ruta")
-        return pesajeDto(pesajes.saveAndFlush(Pesaje(rutaId=r.id,puntoId=puntoId,material=c.material,pesoBruto=c.pesoBruto,tara=c.tara,pesoNeto=neto,operarioId=u.id,observacion=c.observacion,claveCliente=c.claveCliente)))
+        return pesajeDto(pesajes.saveAndFlush(Pesaje(rutaId=r.id,puntoId=puntoId,material=c.material,pesoBruto=c.pesoBruto,tara=c.tara,pesoNeto=neto,operarioId=u.id,observacion=c.observacion,claveCliente=c.claveCliente,humedadEstimada=c.humedadEstimada)))
     }
     fun corregir(id: Long,c: PesajeRequest): Map<String,Any> {
         val u=exigir("PESAJE_EDITAR")
@@ -91,6 +91,7 @@ class EcoService(private val usuarios: UsuarioRepository,private val puntos: Pun
         ReglasPesaje.puedeCorregir(u.id,v.operarioId,v.fechaHora.atZone(zona).toLocalDate(),hoy(),"PESAJE_ANULAR" in u.privilegios)
         if(v.anulado) throw ErrorNegocio(409,"El pesaje está anulado")
         v.pesoNeto=ReglasPesaje.neto(c.pesoBruto,c.tara); v.material=c.material; v.pesoBruto=c.pesoBruto; v.tara=c.tara; v.observacion=c.observacion
+        v.humedadEstimada=c.humedadEstimada
         return pesajeDto(pesajes.saveAndFlush(v))
     }
     fun anular(id: Long,motivo: String) {
