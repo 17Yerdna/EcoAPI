@@ -7,6 +7,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.*
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.web.servlet.resource.NoResourceFoundException
+import org.springframework.web.bind.MissingServletRequestParameterException
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import pe.upeu.ecorecicla.servicio.ErrorNegocio
 import pe.upeu.ecorecicla.web.dto.ErrorResponse
 
@@ -20,6 +23,10 @@ class ManejadorDeErrores {
     fun formato(e: Exception,r: HttpServletRequest) = response(400,"Solicitud inválida",r.requestURI)
     @ExceptionHandler(DataIntegrityViolationException::class)
     fun conflicto(e: Exception,r: HttpServletRequest) = response(409,"Los datos entran en conflicto con un registro existente",r.requestURI)
+    @ExceptionHandler(NoResourceFoundException::class)
+    fun ausente(e: Exception,r: HttpServletRequest) = response(404,"Recurso no encontrado",r.requestURI)
+    @ExceptionHandler(MissingServletRequestParameterException::class,MethodArgumentTypeMismatchException::class)
+    fun parametro(e: Exception,r: HttpServletRequest) = response(400,"Parámetro requerido o inválido",r.requestURI)
     @ExceptionHandler(Exception::class)
     fun servidor(e: Exception,r: HttpServletRequest): ResponseEntity<ErrorResponse> {
         org.slf4j.LoggerFactory.getLogger(javaClass).error("Fallo interno en {}",r.requestURI,e)

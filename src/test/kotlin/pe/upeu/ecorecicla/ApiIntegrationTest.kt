@@ -16,6 +16,10 @@ import tools.jackson.databind.ObjectMapper
 class ApiIntegrationTest {
     @Value("\${local.server.port}") var port: Int = 0
     @Autowired lateinit var db: JdbcTemplate
+    @Autowired lateinit var em: jakarta.persistence.EntityManager
+    @Autowired lateinit var txManager: org.springframework.transaction.PlatformTransactionManager
+    @Autowired lateinit var dataSource: javax.sql.DataSource
+    @Autowired lateinit var service: pe.upeu.ecorecicla.servicio.EcoService
     val http = HttpClient.newHttpClient()
     val json = ObjectMapper()
     fun request(method: String, path: String, body: String = "", token: String? = null): HttpResponse<String> {
@@ -83,5 +87,22 @@ class ApiIntegrationTest {
         for(f in listOf("contenido","pagina","tamanio","totalElementos","totalPaginas","ultima")) assertTrue(j.has(f))
         assertEquals(2,j.get("contenido").size())
         assertEquals(404,request("GET","/puntos/99999/pesajes",token=login("admin")).statusCode())
+    }
+    @Test fun `RN01 refresca una ruta cargada antes del cierre concurrente`() {
+        val p=pe.upeu.ecorecicla.seguridad.Principal(1,"operario1","OPERARIO",setOf("PESAJE_CREAR"))
+        org.springframework.security.core.context.SecurityContextHolder.getContext().authentication=org.springframework.security.authentication.UsernamePasswordAuthenticationToken(p,null,emptyList())
+        try {
+            val e=assertThrows(pe.upeu.ecorecicla.servicio.ErrorNegocio::class.java) {
+                org.springframework.transaction.support.TransactionTemplate(txManager).execute {
+                    em.find(pe.upeu.ecorecicla.dominio.Ruta::class.java,1L)
+                    dataSource.connection.use { c -> c.createStatement().use { it.executeUpdate("update ruta set cerrada=true where id=1") } }
+                    service.registrar(pe.upeu.ecorecicla.web.dto.PesajeRequest(puntoId=1,material="PAPEL",pesoBruto=10.0,tara=2.0))
+                }
+            }
+            assertEquals(409,e.status)
+        } finally {
+            db.update("update ruta set cerrada=false where id=1")
+            org.springframework.security.core.context.SecurityContextHolder.clearContext()
+        }
     }
 }

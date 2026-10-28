@@ -13,10 +13,12 @@ import pe.upeu.ecorecicla.seguridad.Principal
 import pe.upeu.ecorecicla.config.JwtService
 import pe.upeu.ecorecicla.web.dto.*
 import java.time.*
+import jakarta.persistence.EntityManager
+import jakarta.persistence.LockModeType
 
 @Service
 @Transactional
-class EcoService(private val usuarios: UsuarioRepository,private val puntos: PuntoRepository,private val rutas: RutaRepository,private val asignaciones: RutaPuntoRepository,private val pesajes: PesajeRepository,private val db: JdbcTemplate,private val jwt: JwtService,private val encoder: BCryptPasswordEncoder) {
+class EcoService(private val usuarios: UsuarioRepository,private val puntos: PuntoRepository,private val rutas: RutaRepository,private val asignaciones: RutaPuntoRepository,private val pesajes: PesajeRepository,private val db: JdbcTemplate,private val jwt: JwtService,private val encoder: BCryptPasswordEncoder,private val em: EntityManager) {
     private val zona = ZoneId.of("America/Lima")
     private fun hoy() = LocalDate.now(zona)
     fun principal(): Principal = SecurityContextHolder.getContext().authentication?.principal as? Principal ?: throw ErrorNegocio(401,"Sesión requerida")
@@ -33,8 +35,9 @@ class EcoService(private val usuarios: UsuarioRepository,private val puntos: Pun
         if(db.queryForObject("select count(*) from ruta_usuario where ruta_id=? and usuario_id=?",Int::class.java,r.id,principal().id)==0) throw ErrorNegocio(403,"No pertenece a esta ruta")
     }
     private fun bloquearRuta(id: Long): Ruta {
-        db.queryForObject("select id from ruta where id=? for update",Long::class.java,id) ?: throw ErrorNegocio(404,"Ruta no encontrada")
-        return ruta(id)
+        val r=ruta(id)
+        em.refresh(r,LockModeType.PESSIMISTIC_WRITE)
+        return r
     }
     fun rutaDia(fecha: LocalDate?): Map<String,Any> {
         val p=exigir("PUNTO_LEER")
@@ -84,7 +87,7 @@ class EcoService(private val usuarios: UsuarioRepository,private val puntos: Pun
     fun corregir(id: Long,c: PesajeRequest): Map<String,Any> {
         val u=exigir("PESAJE_EDITAR")
         val v=pesajes.findById(id).orElseThrow { ErrorNegocio(404,"Pesaje no encontrado") }
-        val r=bloquearRuta(v.rutaId); propia(r); ReglasPesaje.rutaAbierta(r.cerrada)
+        val r=bloquearRuta(v.rutaId); if("PESAJE_ANULAR" !in u.privilegios) propia(r); ReglasPesaje.rutaAbierta(r.cerrada)
         ReglasPesaje.puedeCorregir(u.id,v.operarioId,v.fechaHora.atZone(zona).toLocalDate(),hoy(),"PESAJE_ANULAR" in u.privilegios)
         if(v.anulado) throw ErrorNegocio(409,"El pesaje está anulado")
         v.pesoNeto=ReglasPesaje.neto(c.pesoBruto,c.tara); v.material=c.material; v.pesoBruto=c.pesoBruto; v.tara=c.tara; v.observacion=c.observacion
@@ -93,7 +96,7 @@ class EcoService(private val usuarios: UsuarioRepository,private val puntos: Pun
     fun anular(id: Long,motivo: String) {
         val u=exigir("PESAJE_ANULAR")
         if(motivo.isBlank() || motivo.length>500) throw ErrorNegocio(400,"Motivo requerido",mapOf("motivo" to "Entre 1 y 500 caracteres"))
-        val v=pesajes.findById(id).orElseThrow { ErrorNegocio(404,"Pesaje no encontrado") }; propia(ruta(v.rutaId))
+        val v=pesajes.findById(id).orElseThrow { ErrorNegocio(404,"Pesaje no encontrado") }
         v.anulado=true; v.motivoAnulacion=motivo; v.anuladoPor=u.id; v.anuladoEn=Instant.now(); pesajes.save(v)
     }
     fun omitir(rutaId: Long,puntoId: Long,motivo: String): Map<String,Any> {
